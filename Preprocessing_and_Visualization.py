@@ -1,100 +1,236 @@
 pip install pandas numpy matplotlib seaborn scikit-learn
 
 
-# Import Libraries
+# Install required libraries (run once in Jupyter)
+# !pip install pandas numpy matplotlib seaborn scikit-learn
+
+# ==========================================
+# 1. IMPORT LIBRARIES
+# ==========================================
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
-# 1. Load Dataset
-df = pd.read_csv("Data.csv")
+# ==========================================
+# 2. LOAD DATASET
+# ==========================================
+
+df = pd.read_csv(r"C:\Users\Ferci\Downloads\Data .csv")
 
 print("Dataset Loaded Successfully!")
+print("\nFirst 5 Records:")
 print(df.head())
 
-# 2. Visualize Dataset
-# Histogram
-df.hist(figsize=(10, 8))
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nDataset Information:")
+print(df.info())
+
+# ==========================================
+# 3. CHECK MISSING VALUES
+# ==========================================
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+print("\nTotal Missing Values:")
+print(df.isnull().sum().sum())
+
+# ==========================================
+# 4. VISUALIZE NUMERICAL DATA
+# ==========================================
+
+df.hist(figsize=(10, 6), bins=10)
+
 plt.suptitle("Feature Distribution")
 plt.tight_layout()
 plt.show()
 
-# Count missing values
-print("\nMissing Values:")
-print(df.isnull().sum())
+# ==========================================
+# 5. SEPARATE FEATURES AND TARGET
+# ==========================================
 
-# 3. Separate Features and Target
-X = df.iloc[:, :-1].copy()
-y = df.iloc[:, -1].copy()
+X = df.drop("Purchased", axis=1)
+y = df["Purchased"]
 
 # Remove rows with missing target values
 valid = y.notna()
-X = X.loc[valid]
-y = y.loc[valid]
 
-# 4. Identify Numerical and Categorical Columns
-num_cols = X.select_dtypes(include=np.number).columns
-cat_cols = X.select_dtypes(exclude=np.number).columns
+X = X.loc[valid].copy()
+y = y.loc[valid].copy()
 
-# 5. Handle Missing Values
-num_imputer = SimpleImputer(strategy="mean")
-cat_imputer = SimpleImputer(strategy="most_frequent")
+# ==========================================
+# 6. IDENTIFY NUMERICAL AND CATEGORICAL COLUMNS
+# ==========================================
 
-X[num_cols] = num_imputer.fit_transform(X[num_cols])
-X[cat_cols] = cat_imputer.fit_transform(X[cat_cols])
+num_cols = X.select_dtypes(include=np.number).columns.tolist()
 
-print("\nMissing Values Handled!")
-print(X.isnull().sum())
+cat_cols = X.select_dtypes(exclude=np.number).columns.tolist()
 
-# 6. Encode Categorical Data
-X = pd.get_dummies(X, columns=cat_cols, dtype=int)
+print("\nNumerical Columns:", num_cols)
+print("Categorical Columns:", cat_cols)
 
-# Encode Target Column
+# ==========================================
+# 7. SPLIT DATASET
+# ==========================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+print("\nTraining Data Shape:", X_train.shape)
+print("Testing Data Shape:", X_test.shape)
+
+# ==========================================
+# 8. HANDLE MISSING VALUES AND ENCODE DATA
+# ==========================================
+
+# Numerical preprocessing
+num_pipeline = Pipeline([
+    ("imputer", SimpleImputer(strategy="mean")),
+    ("scaler", StandardScaler())
+])
+
+# Categorical preprocessing
+cat_pipeline = Pipeline([
+    ("imputer", SimpleImputer(strategy="most_frequent")),
+    ("encoder", __import__("sklearn").preprocessing.OneHotEncoder(
+        handle_unknown="ignore"
+    ))
+])
+
+# Combine preprocessing
+preprocessor = ColumnTransformer([
+    ("numerical", num_pipeline, num_cols),
+    ("categorical", cat_pipeline, cat_cols)
+])
+
+# Fit only on training data
+X_train_processed = preprocessor.fit_transform(X_train)
+
+# Transform testing data
+X_test_processed = preprocessor.transform(X_test)
+
+# Convert to DataFrames
+feature_names = preprocessor.get_feature_names_out()
+
+X_train_processed = pd.DataFrame(
+    X_train_processed,
+    columns=feature_names,
+    index=X_train.index
+)
+
+X_test_processed = pd.DataFrame(
+    X_test_processed,
+    columns=feature_names,
+    index=X_test.index
+)
+
+# ==========================================
+# 9. ENCODE TARGET COLUMN
+# ==========================================
+
 le = LabelEncoder()
-y = le.fit_transform(y)
 
-print("\nCategorical Data Encoded!")
-print(X.head())
+y_train_encoded = le.fit_transform(y_train)
+y_test_encoded = le.transform(y_test)
 
-# 7. Feature Scaling
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+print("\nTarget Encoding:")
+print(dict(zip(le.classes_, le.transform(le.classes_))))
 
-X_scaled = pd.DataFrame(X_scaled, columns=X.columns)
+# ==========================================
+# 10. DISPLAY PREPROCESSED DATA
+# ==========================================
 
-print("\nScaled Dataset:")
-print(X_scaled.head())
+print("\nProcessed Training Dataset:")
+print(X_train_processed.head())
 
-# 8. Correlation Heatmap
-plt.figure(figsize=(10, 8))
-sns.heatmap(X_scaled.corr(), cmap="coolwarm", annot=False)
+print("\nProcessed Testing Dataset:")
+print(X_test_processed.head())
+
+print("\nMissing Values After Preprocessing:")
+print(X_train_processed.isnull().sum())
+
+# ==========================================
+# 11. CORRELATION HEATMAP
+# ==========================================
+
+plt.figure(figsize=(10, 7))
+
+sns.heatmap(
+    X_train_processed.corr(),
+    cmap="coolwarm",
+    annot=True,
+    fmt=".2f"
+)
+
 plt.title("Correlation Heatmap")
+plt.tight_layout()
 plt.show()
 
-# 9. Visualize Categorical Data
+# ==========================================
+# 12. VISUALIZE CATEGORICAL DATA
+# ==========================================
+
 for col in cat_cols:
+
     plt.figure(figsize=(6, 4))
+
     sns.countplot(data=df, x=col)
+
     plt.title("Distribution of " + col)
+    plt.xlabel(col)
+    plt.ylabel("Count")
+
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
 
-# 10. Visualize Target Data
+# ==========================================
+# 13. VISUALIZE TARGET DISTRIBUTION
+# ==========================================
+
 plt.figure(figsize=(6, 4))
+
 sns.countplot(x=y)
-plt.title("Target Class Distribution")
-plt.xlabel("Target Class")
+
+plt.title("Purchased Class Distribution")
+plt.xlabel("Purchased")
+plt.ylabel("Count")
+
+plt.tight_layout()
 plt.show()
 
-# 11. Save Preprocessed Dataset
-X_scaled["Target"] = y
-X_scaled.to_csv("Preprocessed_Data.csv", index=False)
+# ==========================================
+# 14. SAVE PREPROCESSED DATASET
+# ==========================================
 
-print("\nPreprocessing Completed Successfully!")
-print("Saved as Preprocessed_Data.csv")
+train_output = X_train_processed.copy()
+test_output = X_test_processed.copy()
+
+train_output["Purchased"] = y_train_encoded
+test_output["Purchased"] = y_test_encoded
+
+train_output.to_csv("Preprocessed_Train.csv", index=False)
+test_output.to_csv("Preprocessed_Test.csv", index=False)
+
+print("\n===================================")
+print("PREPROCESSING COMPLETED SUCCESSFULLY!")
+print("===================================")
+
+print("\nSaved Files:")
+print("1. Preprocessed_Train.csv")
+print("2. Preprocessed_Test.csv")
